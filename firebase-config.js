@@ -1,10 +1,1 @@
-// بيانات مشروع Firebase — تُستبدل بالقيم الحقيقية من:
-// Firebase Console → Project settings → Your apps → Web app → Config
-window.FIREBASE_CONFIG = {
-  apiKey: "PUT_API_KEY_HERE",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
-};
+window.FIREBASE_CONFIG = {"projectId":"hajj-catering-urcc","appId":"1:22414941135:web:9a8d8111e3730e295a90ba","storageBucket":"hajj-catering-urcc.firebasestorage.app","apiKey":"AIzaSyC5lJPRrlnw5ms9CyMGvuDWhkCEiGT5PqY","authDomain":"hajj-catering-urcc.firebaseapp.com","messagingSenderId":"22414941135","projectNumber":"22414941135","version":"2"};

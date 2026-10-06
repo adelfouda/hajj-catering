@@ -15,7 +15,9 @@
       "README.md",
       "deploy.cmd",
       "deploy-log.txt",
-      "firebase-sdk.json"
+      "firebase-sdk.json",
+      "publish.cmd",
+      "seed-data.json"
     ],
     "headers": [
       {

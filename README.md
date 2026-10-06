@@ -9,17 +9,24 @@
 - `firebase.json` — إعدادات النشر
 
 ## النشر على Firebase
-١. أنشئ مشروع Firebase وفعّل Firestore، وأضف تطبيق ويب.
+١. المشروع على فايربيس:
+```
+hajj-catering-urcc
+```
 
-٢. الصق بيانات الإعداد في:
+٢. قاعدة البيانات في الدمام، وبيانات الربط في:
 ```
 firebase-config.js
 ```
 
-٣. اربط المجلد بالمشروع وانشر:
+٣. انشر بتشغيل الملف:
 ```
-firebase use --add
-firebase deploy
+publish.cmd
+```
+
+## الرابط
+```
+https://hajj-catering-urcc.web.app
 ```
 
 ## ملاحظة
