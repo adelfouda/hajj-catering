@@ -302,7 +302,12 @@ function tryInit(){
   if(synced||COLL.some(c=>!cur[c]))return;
   const n=sum(COLL,c=>cur[c].length);
   if(n>0){adoptRemote();synced=true;syncState='on';save();renderSoon()}
-  else{syncState='empty';render()}
+  else{
+    fetch('seed-data.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{
+      if(d&&d.projects&&!synced){for(const c of ['companies','projects','requests','users','settings'])S[c]=d[c]||[];uploadLocal()}
+      else{syncState='empty';render()}
+    }).catch(()=>{syncState='empty';render()});
+  }
 }
 function uploadLocal(){
   synced=true;syncState='on';LS={companies:{},projects:{},requests:{},users:{},invoices:{},settings:{}};
