@@ -532,13 +532,13 @@ projects(){
       <label class="f" for="mnName">اسم الوجبة<input id="mnName" placeholder="مثال: غداء دجاج"></label>
       <label class="f" for="mnKind">النوع<select id="mnKind">${Object.entries(KIND).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label>
       <label class="f" for="mnItems" style="grid-column:1/-1">المكوّنات<input id="mnItems" placeholder="أرز، دجاج، سلطة، فاكهة"></label>
-    </div><div class="row"><button class="btn primary" id="mnAdd">إضافة إلى القائمة</button>
+    </div><div class="row"><button class="btn primary" id="mnAdd">${ui.mnEdit?'حفظ التعديل':'إضافة إلى القائمة'}</button>${ui.mnEdit?'<button class="btn small ghost" id="mnCancel">إلغاء التعديل</button>':''}
       <button class="btn small ghost" id="mnTpl">⬇️ تنزيل نموذج إكسل</button>
       <span class="btn small ghost upl">⬆️ استيراد من إكسل<input type="file" id="mnImp" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" aria-label="استيراد قائمة الوجبات من ملف إكسل"></span>
       <button class="btn small ghost" id="mnExp">📤 تصدير القائمة إكسل</button></div>
     <p class="hint">نزّل النموذج، واملأ كل وجبة في صف، وبعدها استورده. الوجبة الموجودة بنفس القسم والاسم بتتحدّث، والجديدة بتتضاف.</p>
     <div class="tbl"><table><thead><tr><th>القسم</th><th>الوجبة</th><th>النوع</th><th>المكوّنات</th><th></th></tr></thead><tbody>
-    ${MEALS.flatMap(c=>menuOf(c)).map(x=>`<tr><td>${esc(x.cat)}</td><td>${esc(x.name)}</td><td>${kindOf(x)}</td><td style="white-space:normal;min-width:180px">${esc(x.items)}</td><td><button class="btn small danger" data-mndel="${x.id}">حذف</button></td></tr>`).join('')||'<tr><td colspan="5" class="muted">لا توجد وجبات في القائمة بعد.</td></tr>'}
+    ${MEALS.flatMap(c=>menuOf(c)).map(x=>`<tr><td>${esc(x.cat)}</td><td>${esc(x.name)}</td><td>${kindOf(x)}</td><td style="white-space:normal;min-width:180px">${esc(x.items)}</td><td style="white-space:nowrap"><button class="btn small" data-mned="${x.id}">تعديل</button> <button class="btn small danger" data-mndel="${x.id}">حذف</button></td></tr>`).join('')||'<tr><td colspan="5" class="muted">لا توجد وجبات في القائمة بعد.</td></tr>'}
     </tbody></table></div></div>`;
 },
 
@@ -746,7 +746,13 @@ projects(){
       }catch(e){toast('تعذّرت قراءة الملف. استخدم نموذج الإكسل')}
       mnInp.value='';
     };
+    const mnEd=ui.mnEdit&&menuItems().find(x=>x.id===ui.mnEdit);
+    if(ui.mnEdit&&!mnEd)ui.mnEdit=null;
+    if(mnEd){$('#mnCat').value=mnEd.cat;$('#mnName').value=mnEd.name;$('#mnKind').value=mnEd.kind||'hot';$('#mnItems').value=mnEd.items||''}
+    if($('#mnCancel'))$('#mnCancel').onclick=()=>{ui.mnEdit=null;render()};
+    document.querySelectorAll('[data-mned]').forEach(b=>b.onclick=()=>{ui.mnEdit=b.dataset.mned;render();const p=$('#menuPanel');p&&p.scrollIntoView({behavior:'smooth',block:'start'});setTimeout(()=>$('#mnName')&&$('#mnName').focus(),300)});
     $('#mnAdd').onclick=()=>{const name=$('#mnName').value.trim();if(!name){toast('اكتب اسم الوجبة');return}
+      if(ui.mnEdit){const id=ui.mnEdit;setMenu(menuItems().map(x=>x.id===id?{...x,cat:$('#mnCat').value,name,kind:$('#mnKind').value,items:$('#mnItems').value.trim()}:x));ui.mnEdit=null;save();render();toast('اتحفظ تعديل الوجبة');return}
       setMenu(menuItems().concat([{id:uid(),cat:$('#mnCat').value,name,kind:$('#mnKind').value,items:$('#mnItems').value.trim()}]));save();render();toast('أُضيفت الوجبة إلى القائمة')};
     document.querySelectorAll('[data-mndel]').forEach(b=>b.onclick=()=>{if(!b.dataset.sure){b.dataset.sure=1;b.textContent='تأكيد الحذف';return}
       setMenu(menuItems().filter(x=>x.id!==b.dataset.mndel));save();render();toast('حُذفت الوجبة من القائمة')});
