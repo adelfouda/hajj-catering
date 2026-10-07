@@ -532,7 +532,11 @@ projects(){
       <label class="f" for="mnName">اسم الوجبة<input id="mnName" placeholder="مثال: غداء دجاج"></label>
       <label class="f" for="mnKind">النوع<select id="mnKind">${Object.entries(KIND).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label>
       <label class="f" for="mnItems" style="grid-column:1/-1">المكوّنات<input id="mnItems" placeholder="أرز، دجاج، سلطة، فاكهة"></label>
-    </div><div class="row"><button class="btn primary" id="mnAdd">إضافة إلى القائمة</button></div>
+    </div><div class="row"><button class="btn primary" id="mnAdd">إضافة إلى القائمة</button>
+      <button class="btn small ghost" id="mnTpl">⬇️ تنزيل نموذج إكسل</button>
+      <span class="btn small ghost upl">⬆️ استيراد من إكسل<input type="file" id="mnImp" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" aria-label="استيراد قائمة الوجبات من ملف إكسل"></span>
+      <button class="btn small ghost" id="mnExp">📤 تصدير القائمة إكسل</button></div>
+    <p class="hint">نزّل النموذج، واملأ كل وجبة في صف، وبعدها استورده. الوجبة الموجودة بنفس القسم والاسم بتتحدّث، والجديدة بتتضاف.</p>
     <div class="tbl"><table><thead><tr><th>القسم</th><th>الوجبة</th><th>النوع</th><th>المكوّنات</th><th></th></tr></thead><tbody>
     ${MEALS.flatMap(c=>menuOf(c)).map(x=>`<tr><td>${esc(x.cat)}</td><td>${esc(x.name)}</td><td>${kindOf(x)}</td><td style="white-space:normal;min-width:180px">${esc(x.items)}</td><td><button class="btn small danger" data-mndel="${x.id}">حذف</button></td></tr>`).join('')||'<tr><td colspan="5" class="muted">لا توجد وجبات في القائمة بعد.</td></tr>'}
     </tbody></table></div></div>`;
@@ -703,6 +707,45 @@ projects(){
     nb.onclick=()=>{ui.editProject=blankProject();render()};
     document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{ui.editProject=JSON.parse(JSON.stringify(proj(b.dataset.edit)));render()});
     document.querySelectorAll('[data-gen]').forEach(b=>b.onclick=()=>{const n=genDay(b.dataset.gen,today);toast(n?`أُنشئ ${n} طلب لليوم`:'طلبات اليوم موجودة بالفعل')});
+    const MN_HEAD=['القسم','اسم الوجبة','النوع','المكوّنات'];
+    const mnBook=(rows,name)=>{
+      if(!window.XLSX){toast('تعذّر تحميل مكتبة إكسل');return}
+      const wb=XLSX.utils.book_new();wb.Workbook={Views:[{RTL:true}]};
+      const ws=XLSX.utils.aoa_to_sheet([MN_HEAD].concat(rows));ws['!cols']=[{wch:16},{wch:28},{wch:16},{wch:50}];
+      XLSX.utils.book_append_sheet(wb,ws,'الوجبات');
+      const help=[['التعليمات'],['املأ ورقة «الوجبات»: كل وجبة في صف، ولا تغيّر عناوين الأعمدة.'],['عمود القسم لازم يكون واحد من الأقسام دي:'],...MEALS.map(m=>['  '+m]),['عمود النوع لازم يكون واحد من دول:'],...Object.values(KIND).map(k=>['  '+k]),['المكوّنات: افصل بينها بفاصلة.']];
+      const wh=XLSX.utils.aoa_to_sheet(help);wh['!cols']=[{wch:60}];XLSX.utils.book_append_sheet(wb,wh,'التعليمات');
+      const out=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+      saveFile(name,new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+    };
+    $('#mnTpl').onclick=()=>mnBook([['غداء','غداء دجاج','ساخنة','أرز، دجاج، سلطة، فاكهة'],['فطور','فطور جاف','جافة','ساندويتش جبن، عصير، تمر']],'نموذج-قائمة-الوجبات.xlsx');
+    $('#mnExp').onclick=()=>{const L=MEALS.flatMap(c=>menuOf(c));if(!L.length){toast('القائمة فاضية');return}mnBook(L.map(x=>[x.cat,x.name,kindOf(x),x.items||'']),'قائمة-الوجبات-'+today+'.xlsx')};
+    const mnInp=$('#mnImp');
+    mnInp.onclick=()=>{window.__picking=true;setTimeout(()=>{window.__picking=false},120000)};
+    mnInp.oncancel=()=>{window.__picking=false};
+    mnInp.onchange=async()=>{window.__picking=false;const f=mnInp.files[0];if(!f)return;
+      if(!window.XLSX){toast('تعذّر تحميل مكتبة إكسل');return}
+      try{
+        const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
+        const ws=wb.Sheets['الوجبات']||wb.Sheets[wb.SheetNames[0]];
+        const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''}).slice(1);
+        const norm=t=>String(t??'').replace(/\s+/g,' ').trim();
+        const kmap={};Object.entries(KIND).forEach(([k,v])=>{kmap[norm(v)]=k;kmap[norm(v).replace(/\s/g,'')]=k});
+        let L=menuItems().slice(),add=0,upd=0,bad=[];
+        rows.forEach((r,i)=>{
+          const cat=norm(r[0]),name=norm(r[1]),kt=norm(r[2]),items=norm(r[3]);
+          if(!cat&&!name&&!kt&&!items)return;
+          if(!name||!MEALS.includes(cat)){bad.push(i+2);return}
+          const kind=kt?(kmap[kt]||kmap[kt.replace(/\s/g,'')]):'hot';
+          if(!kind){bad.push(i+2);return}
+          const ex=L.find(x=>x.cat===cat&&norm(x.name)===name);
+          if(ex){Object.assign(ex,{kind,items});upd++}else{L.push({id:uid(),cat,name,kind,items});add++}
+        });
+        if(add||upd){setMenu(L);save();render()}
+        toast('تمت إضافة '+add+' وتحديث '+upd+(bad.length?' · صفوف فيها خطأ واتجاهلت: '+bad.join('، '):''));
+      }catch(e){toast('تعذّرت قراءة الملف. استخدم نموذج الإكسل')}
+      mnInp.value='';
+    };
     $('#mnAdd').onclick=()=>{const name=$('#mnName').value.trim();if(!name){toast('اكتب اسم الوجبة');return}
       setMenu(menuItems().concat([{id:uid(),cat:$('#mnCat').value,name,kind:$('#mnKind').value,items:$('#mnItems').value.trim()}]));save();render();toast('أُضيفت الوجبة إلى القائمة')};
     document.querySelectorAll('[data-mndel]').forEach(b=>b.onclick=()=>{if(!b.dataset.sure){b.dataset.sure=1;b.textContent='تأكيد الحذف';return}
