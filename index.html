@@ -613,7 +613,7 @@ execution(){
         <button class="btn info" data-depart="${r.id}">تسجيل الانطلاق</button>`:
         `<div class="hint">السائق: ${esc(r.driver)||'—'}${r.driverPhone?` · <a href="tel:${esc(r.driverPhone)}" class="ltr">${esc(r.driverPhone)}</a>`:''} · السيارة: ${esc(r.vehicle)||'—'}<br>انطلقت <span class="ltr">${r.departedAt}</span>${r.deliveredAt?` · سُلِّمت <span class="ltr">${r.deliveredAt}</span>`:''}</div>`}
       ${r.status==='departed'?`<button class="btn ok" data-deliver="${r.id}">تأكيد التسليم</button>`:''}
-      ${r.status!=='pending'?`<div class="row"><span class="btn small ghost upl">التقاط أو تحميل الصورة<input type="file" id="up-${r.id}" data-up="${r.id}" accept="image/*" aria-label="التقاط أو تحميل صورة الفاتورة"></span></div>
+      ${r.status!=='pending'?`<div class="row"><span class="btn small upl">📷 تصوير الفاتورة<input type="file" id="up-${r.id}" data-up="${r.id}" accept="image/*" capture="environment" aria-label="تصوير الفاتورة بالكاميرا"></span><span class="btn small ghost upl">🖼️ من المعرض<input type="file" data-up="${r.id}" accept="image/*" aria-label="اختيار صورة الفاتورة من المعرض"></span></div>
         ${r.invoices.length?`<div class="thumbs">${r.invoices.map(i=>`<span class="ph"><img src="${i.src}" data-zoom alt="فاتورة"><button class="x noprint" data-invdel="${i.id}" aria-label="حذف الصورة" title="حذف الصورة">×</button></span>`).join('')}</div>`:''}`:''}
     </div>`}).join('')}</div>`:`<p class="hint">${all.length?'لا توجد طلبات بهذه الحالة في هذا النطاق.':'لا توجد طلبات في هذا النطاق.'}</p>`}`;
 },
