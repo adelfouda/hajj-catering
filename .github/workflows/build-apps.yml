@@ -63,9 +63,3 @@ jobs:
           ls -la downloads
           gh release view apps-latest >/dev/null 2>&1 || gh release create apps-latest --title "تطبيقات إعاشة الحجاج" --notes "أحدث نسخة من تطبيق أندرويد وتطبيق ويندوز"
           gh release upload apps-latest downloads/hajj-catering.apk downloads/hajj-catering-setup.exe --clobber
-      - uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_HAJJ_CATERING_URCC }}
-          channelId: live
-          projectId: hajj-catering-urcc
