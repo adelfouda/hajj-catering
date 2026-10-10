@@ -195,7 +195,7 @@ break;case"<bookViews":;case"<bookViews>":;case"</bookViews>":break;case"<workbo
 const ROLES={admin:'مدير النظام',manager:'الإدارة',rep:'مندوب',assistant:'مساعد',driver:'سائق'};
 const PERMS=[
   ['dashboard','لوحة اليوم',          {admin:1,manager:1,rep:1,assistant:1,driver:0}],
-  ['projects','الشركات والمشاريع',     {admin:1,manager:1,rep:0,assistant:0,driver:0}],
+  ['projects','الشركات والوجبات',     {admin:1,manager:1,rep:0,assistant:0,driver:0}],
   ['requests','تسجيل الطلبات',         {admin:1,manager:1,rep:1,assistant:1,driver:0}],
   ['execution','التنفيذ والتسليم',     {admin:1,manager:1,rep:1,assistant:1,driver:1}],
   ['invoices','الفواتير',              {admin:1,manager:1,rep:1,assistant:0,driver:0}],
@@ -449,7 +449,7 @@ function reqList(){
 }
 const NATS=['مصر','السعودية','السودان','الأردن','فلسطين','سوريا','العراق','اليمن','المغرب','الجزائر','تونس','ليبيا','إندونيسيا','ماليزيا','باكستان','الهند','بنغلاديش','تركيا','إيران','نيجيريا','السنغال'];
 const hotelNat=(p,h)=>(h&&h.nationality!==undefined?h.nationality:comp(p?.companyId)?.nationality)||'';
-const natOf=r=>{const p=proj(r.projectId);return hotelNat(p,p?.hotels.find(h=>h.name===r.hotel))};
+const natOf=r=>{if(r.nat)return r.nat;const p=proj(r.projectId);return hotelNat(p,p?.hotels.find(h=>h.name===r.hotel))};
 function reqRows(){
   return reqList().map(r=>[fmtDate(r.date),comp(proj(r.projectId)?.companyId)?.name||'',proj(r.projectId)?.name||'',r.hotel,natOf(r),r.meal,kindOf(r),r.items||'',r.time,r.count,ST[r.status],r.driver||'',r.driverPhone||'']);
 }
@@ -517,15 +517,22 @@ dashboard(){
 
 projects(){
   if(ui.editProject)return projectForm();
-  return `<div class="head"><div><h1>الشركات والمشاريع</h1><p>أدخل بيانات كل شركة ومشروعها مرة واحدة، وتُملأ الطلبات اليومية منها تلقائيًا.</p></div>
-    <button class="btn primary" id="newProj">+ شركة / مشروع جديد</button></div>
-  <div class="cards">${S.projects.map(p=>{const c=comp(p.companyId);const pil=sum(p.hotels,h=>+h.pilgrims);return `
-    <div class="panel"><div><h3>${esc(c?.name)}</h3><div class="muted">${esc(p.name)}</div></div>
-      <div class="hint">من ${fmtDate(p.start)} إلى ${fmtDate(p.end)} · ${pil.toLocaleString('ar-EG')} حاج</div>
-      <div class="chips">${p.hotels.map(h=>`<span class="chip">${esc(h.name)} (${h.pilgrims}${hotelNat(p,h)?' · '+esc(hotelNat(p,h)):''})</span>`).join('')}</div>
-      <div class="chips">${p.meals.map(m=>`<span class="chip" title="${esc(m.items||'')}">${esc(m.type)} · ${kindOf(m)} <span class="ltr">${m.time}</span></span>`).join('')}</div>
-      <div class="row"><button class="btn small" data-edit="${p.id}">تعديل</button><button class="btn small ghost" data-gen="${p.id}">إنشاء طلبات اليوم</button></div>
-    </div>`}).join('')}</div>
+  const coE=ui.coEdit&&comp(ui.coEdit);
+  const coReqs=c=>S.requests.filter(r=>proj(r.projectId)?.companyId===c.id).length;
+  return `<div class="head"><div><h1>الشركات</h1><p>سجّل أسماء الشركات هنا كمرجع تختار منه في «تسجيل الطلبات». المشروع والفندق والجنسية والوجبة بتتسجّل مع كل طلب، ومش مربوطة بالشركة.</p></div></div>
+  <div class="panel"><h2>${coE?'تعديل شركة':'إضافة شركة'}</h2>
+    <div class="fields">
+      <label class="f" for="coName">اسم الشركة<input id="coName" value="${esc(coE?.name||'')}" placeholder="مثال: مناسك المشاعر"></label>
+      <label class="f" for="coContact">المسؤول<input id="coContact" value="${esc(coE?.contact||'')}"></label>
+      <label class="f" for="coPhone">الجوال<input id="coPhone" type="tel" dir="ltr" value="${esc(coE?.phone||'')}"></label>
+    </div>
+    <div class="row"><button class="btn primary" id="newProj">${coE?'حفظ التعديل':'+ إضافة شركة'}</button>${coE?'<button class="btn small ghost" id="coCancel">إلغاء التعديل</button>':''}</div>
+  </div>
+  <div class="panel"><h2>الشركات المسجلة</h2>
+    <div class="tbl"><table><thead><tr><th>الشركة</th><th>المسؤول</th><th>الجوال</th><th>الطلبات</th><th></th></tr></thead><tbody>
+    ${S.companies.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.contact)||'—'}</td><td><span class="ltr">${esc(c.phone)||'—'}</span></td><td class="num">${coReqs(c)}</td>
+      <td style="white-space:nowrap"><button class="btn small" data-coed="${c.id}">تعديل</button> <button class="btn small danger" data-codel="${c.id}">حذف</button></td></tr>`).join('')||'<tr><td colspan="5" class="muted">لا توجد شركات بعد.</td></tr>'}
+    </tbody></table></div></div>
   <div class="panel" id="menuPanel"><div><h2>قائمة الوجبات</h2><p class="hint">سجّل الوجبات الجاهزة مرة واحدة لكل قسم، ثم اخترها في المشاريع والطلبات فتُملأ مكوّناتها ونوعها تلقائيًا.</p></div>
     <div class="fields">
       <label class="f" for="mnCat">القسم<select id="mnCat">${MEALS.map(m=>`<option>${m}</option>`).join('')}</select></label>
@@ -547,7 +554,7 @@ requests(){
   const opts=S.projects.map(p=>`<option value="${p.id}">${esc(projLabel(p))}</option>`).join('');
   return `<div class="head"><div><h1>تسجيل الطلبات</h1><p>اختر من البيانات المسجلة لملء الطلب تلقائيًا، أو أضف بيانات جديدة مباشرة.</p></div></div>
   <div class="grid2">
-  <div class="panel"><h2>طلب جديد</h2>
+  <div class="panel" id="reqForm"><h2>${ui.reqEdit?'تعديل الطلب':'طلب جديد'}</h2>
     <div class="fields">
       <label class="f" for="rComp">الشركة<input id="rComp" list="rCompL" autocomplete="off" placeholder="اختر أو اكتب شركة جديدة"></label>
       <datalist id="rCompL">${S.companies.map(c=>`<option value="${esc(c.name)}">`).join('')}</datalist>
@@ -566,8 +573,8 @@ requests(){
       <label class="f" for="rCount">عدد الوجبات<input type="number" id="rCount" min="1"></label>
       <label class="f" for="rItems" style="grid-column:1/-1">المكوّنات<input id="rItems" placeholder="مثال: أرز، دجاج، سلطة"></label>
     </div>
-    <p class="hint">اختر من القوائم فتُملأ باقي الحقول تلقائيًا (الحقول المظلّلة). وإذا كتبت شركة أو مشروعًا أو فندقًا أو وجبة غير مسجلة، تُضاف تلقائيًا إلى «الشركات والمشاريع» عند الحفظ.</p>
-    <div class="row"><button class="btn primary" id="addReq">حفظ الطلب</button></div>
+    <p class="hint">اختر من القوائم فتُملأ باقي الحقول تلقائيًا (الحقول المظلّلة). وإذا كتبت شركة أو مشروعًا أو فندقًا أو وجبة غير مسجلة، تُضاف تلقائيًا للقوائم عند الحفظ.</p>
+    <div class="row"><button class="btn primary" id="addReq">${ui.reqEdit?'حفظ التعديل':'حفظ الطلب'}</button>${ui.reqEdit?'<button class="btn small ghost" id="reqCancel">إلغاء التعديل</button>':''}</div>
   </div>
   <div class="panel"><h2>إدخال سريع</h2>
     <p class="hint">بدل إدخال كل طلب على حدة:</p>
@@ -591,7 +598,7 @@ requests(){
   ${R.map(r=>`<tr><td>${fmtDate(r.date)}</td><td>${esc(comp(proj(r.projectId)?.companyId)?.name||'')}</td><td>${esc(proj(r.projectId)?.name||'')}</td><td>${esc(r.hotel)}</td><td>${esc(natOf(r))||'—'}</td><td>${esc(r.meal)}</td><td>${kindOf(r)}</td><td style="white-space:normal;min-width:140px">${esc(r.items)||'—'}</td><td><span class="ltr">${r.time}</span></td>
     <td><input type="number" value="${r.count}" data-cnt="${r.id}" style="width:90px" aria-label="عدد الوجبات" ${r.status!=='pending'?'disabled':''}></td>
     <td><span class="pill p-${r.status}">${ST[r.status]}</span></td>
-    <td class="noprint">${r.status==='pending'?`<button class="btn small danger" data-del="${r.id}">حذف</button>`:''}</td></tr>`).join('')}
+    <td class="noprint" style="white-space:nowrap"><button class="btn small" data-redit="${r.id}">تعديل</button> ${r.status==='pending'?`<button class="btn small danger" data-del="${r.id}">حذف</button>`:''}</td></tr>`).join('')}
   </tbody></table></div><p class="hint">الإجمالي: ${sum(R,r=>+r.count).toLocaleString('ar-EG')} وجبة في ${R.length} طلب.</p>`:`<p class="hint">لا توجد طلبات في هذا النطاق.</p>`}
   </div>`;
 },
@@ -704,7 +711,18 @@ dashboard(){$('#dDate').onchange=e=>{ui.date=e.target.value;render()}},
 projects(){
   const nb=$('#newProj');
   if(nb){
-    nb.onclick=()=>{ui.editProject=blankProject();render()};
+    nb.onclick=()=>{const name=$('#coName').value.trim();if(!name){toast('اكتب اسم الشركة');return}
+      const dup=S.companies.find(c=>c.name===name&&c.id!==ui.coEdit);if(dup){toast('الشركة دي مسجلة قبل كده');return}
+      const data={name,contact:$('#coContact').value.trim(),phone:$('#coPhone').value.trim()};
+      if(ui.coEdit){Object.assign(comp(ui.coEdit),data);ui.coEdit=null;toast('اتحفظ تعديل الشركة')}
+      else{S.companies.push({id:uid(),...data});toast('أُضيفت الشركة')}
+      save();render()};
+    if($('#coCancel'))$('#coCancel').onclick=()=>{ui.coEdit=null;render()};
+    document.querySelectorAll('[data-coed]').forEach(b=>b.onclick=()=>{ui.coEdit=b.dataset.coed;render();window.scrollTo({top:0,behavior:'smooth'});setTimeout(()=>$('#coName')&&$('#coName').focus(),300)});
+    document.querySelectorAll('[data-codel]').forEach(b=>b.onclick=()=>{const id=b.dataset.codel;
+      if(S.requests.some(r=>proj(r.projectId)?.companyId===id)){toast('مينفعش تحذف شركة عليها طلبات. احذف طلباتها الأول أو عدّل اسمها');return}
+      if(!b.dataset.sure){b.dataset.sure=1;b.textContent='تأكيد الحذف';return}
+      S.companies=S.companies.filter(c=>c.id!==id);S.projects=S.projects.filter(p=>p.companyId!==id);if(ui.coEdit===id)ui.coEdit=null;save();render();toast('حُذفت الشركة')});
     document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{ui.editProject=JSON.parse(JSON.stringify(proj(b.dataset.edit)));render()});
     document.querySelectorAll('[data-gen]').forEach(b=>b.onclick=()=>{const n=genDay(b.dataset.gen,today);toast(n?`أُنشئ ${n} طلب لليوم`:'طلبات اليوم موجودة بالفعل')});
     const MN_HEAD=['القسم','اسم الوجبة','النوع','المكوّنات'];
@@ -800,11 +818,14 @@ requests(){
     $('#rProjL').innerHTML=ps.map(p=>`<option value="${esc(p.name)}">`).join('');
     if(ps.length===1&&!V('#rProjN'))mark('#rProjN',ps[0].name);fillProjDeps()};
   const fillProjDeps=()=>{const p=curProj();
-    $('#rHotelL').innerHTML=(p?p.hotels:[]).map(h=>`<option value="${esc(h.name)}">`).join('');
+    const allH=[...new Set((p?p.hotels.map(h=>h.name):[]).concat(S.projects.flatMap(x=>x.hotels.map(h=>h.name)),S.requests.map(r=>r.hotel)).filter(Boolean))];
+    $('#rHotelL').innerHTML=allH.map(h=>`<option value="${esc(h)}">`).join('');
     const ms=[...new Set((p?p.meals.map(m=>m.type):[]).concat(MEALS))];
     $('#rMealL').innerHTML=ms.map(m=>`<option value="${esc(m)}">`).join('');
     if(p&&p.hotels.length===1&&!V('#rHotel'))mark('#rHotel',p.hotels[0].name);fillHotel();fillMeal()};
-  const fillHotel=()=>{const p=curProj(),h=p?.hotels.find(x=>x.name===V('#rHotel'));if(h){mark('#rCount',h.pilgrims);mark('#rNat',hotelNat(p,h))}};
+  const fillHotel=()=>{const hn=V('#rHotel');let p=curProj(),h=p?.hotels.find(x=>x.name===hn);
+    if(!h){p=S.projects.find(x=>x.hotels.some(y=>y.name===hn));h=p?.hotels.find(y=>y.name===hn)}
+    if(h){mark('#rCount',h.pilgrims);mark('#rNat',hotelNat(p,h))}else{const lr=S.requests.filter(r=>r.hotel===hn).pop();if(lr&&natOf(lr))mark('#rNat',natOf(lr))}};
   const fillMenu=()=>{const ms=menuOf(V('#rMeal')),p=curProj(),pm=p?.meals.find(x=>x.type===V('#rMeal'));
     $('#rMenu').innerHTML='<option value="">—</option>'+ms.map(x=>`<option value="${x.id}" ${pm&&pm.menuId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')};
   const fillMeal=()=>{fillMenu();const p=curProj(),m=p?.meals.find(x=>x.type===V('#rMeal'));if(m){mark('#rTime',m.time);mark('#rKind',m.kind||'hot');mark('#rItems',m.items||'')}
@@ -827,8 +848,19 @@ requests(){
     else if(!hotelNat(p,h)&&V('#rNat'))h.nationality=V('#rNat');
     let m=p.meals.find(x=>x.type===mn);
     if(!m){m={type:mn,time:$('#rTime').value||'12:00',kind:$('#rKind').value,items:V('#rItems'),menuId:$('#rMenu').value};p.meals.push(m);added.push('وجبة')}
-    S.requests.push({id:uid(),projectId:p.id,date,hotel:hn,meal:mn,time:$('#rTime').value||m.time,kind:$('#rKind').value,items:V('#rItems'),count:c,status:'pending',driver:'',vehicle:'',departedAt:'',deliveredAt:'',invoices:[]});
-    ui.date=date;save();render();toast(added.length?'حُفظ الطلب، وأُضيف إلى الشركات والمشاريع: '+added.join('، '):'حُفظ الطلب')};
+    const fields={projectId:p.id,date,hotel:hn,nat:V('#rNat'),meal:mn,time:$('#rTime').value||m.time,kind:$('#rKind').value,items:V('#rItems'),count:c};
+    const ed=ui.reqEdit&&S.requests.find(r=>r.id===ui.reqEdit);
+    if(ed){Object.assign(ed,fields);ui.reqEdit=null}
+    else S.requests.push({id:uid(),...fields,status:'pending',driver:'',vehicle:'',departedAt:'',deliveredAt:'',invoices:[]});
+    ui.date=date;save();render();toast((ed?'اتحفظ تعديل الطلب':'حُفظ الطلب')+(added.length?'، وأُضيف للقوائم: '+added.join('، '):''))};
+  const re=ui.reqEdit&&S.requests.find(r=>r.id===ui.reqEdit);
+  if(ui.reqEdit&&!re)ui.reqEdit=null;
+  if(re){const rp=proj(re.projectId);$('#rComp').value=comp(rp?.companyId)?.name||'';$('#rProjN').value=rp?.name||'';fillProjList();
+    $('#rDate').value=re.date;$('#rHotel').value=re.hotel;$('#rNat').value=natOf(re)||'';$('#rMeal').value=re.meal;fillMenu();
+    $('#rKind').value=re.kind||'hot';$('#rTime').value=re.time||'';$('#rCount').value=re.count;$('#rItems').value=re.items||'';
+    document.querySelectorAll('#reqForm .auto').forEach(x=>x.classList.remove('auto'))}
+  if($('#reqCancel'))$('#reqCancel').onclick=()=>{ui.reqEdit=null;render()};
+  document.querySelectorAll('[data-redit]').forEach(b=>b.onclick=()=>{ui.reqEdit=b.dataset.redit;render();const f=$('#reqForm');f&&f.scrollIntoView({behavior:'smooth',block:'start'})});
   $('#genDay').onclick=()=>{const n=genDay($('#qProj').value,ui.date);render();toast(n?`أُنشئ ${n} طلب`:'كل طلبات هذا المشروع موجودة لهذا اليوم')};
   $('#copyPrev').onclick=()=>{const prev=addDays(ui.date,-1);const src=S.requests.filter(r=>r.date===prev&&r.projectId===$('#qProj').value);
     if(!src.length){toast('لا توجد طلبات أمس لهذا المشروع');return}let n=0;
