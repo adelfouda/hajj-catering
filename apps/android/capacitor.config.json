@@ -1,0 +1,12 @@
+{
+  "appId": "com.urcc.hajjcatering",
+  "appName": "إعاشة الحجاج",
+  "webDir": "www",
+  "appendUserAgent": "HajjCateringApp",
+  "backgroundColor": "#F3F5F2",
+  "server": {
+    "url": "https://hajj-catering-urcc.web.app",
+    "androidScheme": "https",
+    "cleartext": false
+  }
+}

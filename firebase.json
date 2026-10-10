@@ -17,7 +17,9 @@
       "deploy-log.txt",
       "firebase-sdk.json",
       "publish.cmd",
-      "seed-data.json"
+      "seed-data.json",
+      "apps/**",
+      "icons/*.svg"
     ],
     "headers": [
       {
@@ -26,6 +28,24 @@
           {
             "key": "Cache-Control",
             "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "source": "/sw.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "source": "/downloads/**",
+        "headers": [
+          {
+            "key": "Content-Disposition",
+            "value": "attachment"
           }
         ]
       }

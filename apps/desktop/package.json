@@ -1,0 +1,31 @@
+{
+  "name": "hajj-catering",
+  "productName": "Hajj Catering",
+  "version": "1.0.0",
+  "description": "نظام إعاشة الحجاج",
+  "author": "URCC",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --publish never"
+  },
+  "devDependencies": {
+    "electron": "^31.7.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.urcc.hajjcatering",
+    "productName": "Hajj Catering",
+    "files": ["main.js", "icon.png"],
+    "directories": { "output": "dist" },
+    "win": { "target": "nsis", "icon": "icon.png" },
+    "nsis": {
+      "oneClick": true,
+      "artifactName": "hajj-catering-setup.exe",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "إعاشة الحجاج"
+    }
+  }
+}

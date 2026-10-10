@@ -3,3 +3,8 @@ firebase-debug.log
 node_modules/
 firebase-sdk.json
 deploy-log.txt
+apps/android/node_modules/
+apps/android/android/
+apps/desktop/node_modules/
+apps/desktop/dist/
+downloads/
