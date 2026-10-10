@@ -210,6 +210,14 @@ nav button{display:flex;align-items:center;gap:8px}
   if('serviceWorker' in navigator)window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})});
   var dp=null;
   window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();dp=e;var b=document.getElementById('pwaInstall');if(b){b.hidden=false;b.onclick=function(){dp.prompt();dp.userChoice.finally(function(){dp=null;b.hidden=true})}}});
+  // تحديث تلقائي: لما التطبيق يرجع للواجهة، يشوف لو فيه نسخة أحدث على الموقع ويحمّلها
+  var tag=null,chk=function(){return fetch('/index.html',{method:'HEAD',cache:'no-store'}).then(function(r){return r.headers.get('etag')||r.headers.get('last-modified')}).catch(function(){return null})};
+  chk().then(function(t){tag=t});
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState!=='visible')return;
+    if(navigator.serviceWorker&&navigator.serviceWorker.getRegistration)navigator.serviceWorker.getRegistration().then(function(r){r&&r.update()}).catch(function(){});
+    chk().then(function(t){var a=document.activeElement;if(t&&tag&&t!==tag&&!(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName))&&!window.__picking)location.reload()});
+  });
   if((matchMedia('(display-mode: standalone)').matches||/HajjCateringApp/.test(navigator.userAgent))&&box)box.hidden=true;
 })();
 </script>
