@@ -183,8 +183,10 @@ nav button{display:flex;align-items:center;gap:8px}
 .app{position:relative;z-index:1}
 aside{background:color-mix(in srgb,var(--surface) 92%,transparent)}
 .panel,.stat,.job{background:color-mix(in srgb,var(--surface) 90%,transparent)}
-@media (max-width:820px){.wm{top:56px;bottom:calc(58px + env(safe-area-inset-bottom,0px));flex-direction:column;justify-content:space-around;gap:0;opacity:.09}.wm svg{width:96vw;max-height:40%}}
+@media (max-width:820px){.wm{top:56px;bottom:calc(58px + env(safe-area-inset-bottom,0px));flex-direction:column;justify-content:space-around;gap:0;opacity:.09}.wm svg{width:96vw;max-height:40%}.wm{opacity:.13}}
 @media print{.wm{display:none}}
+.ptr{position:fixed;top:0;left:50%;z-index:50;width:40px;height:40px;margin-left:-20px;border-radius:50%;background:var(--surface);box-shadow:0 2px 10px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;transform:translateY(-60px);transition:transform .15s;pointer-events:none;color:var(--accent);font-size:20px}
+.ptr.spin span{animation:ptrspin .8s linear infinite}@keyframes ptrspin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -228,6 +230,25 @@ aside{background:color-mix(in srgb,var(--surface) 92%,transparent)}
     chk().then(function(t){var a=document.activeElement;if(t&&tag&&t!==tag&&!(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName))&&!window.__picking)location.reload()});
   });
   if((matchMedia('(display-mode: standalone)').matches||/HajjCateringApp/.test(navigator.userAgent))&&box)box.hidden=true;
+})();
+</script>
+<div class="ptr" id="ptr" aria-hidden="true"><span>⟳</span></div>
+<script>
+// اسحب لتحت من أول الصفحة عشان تحدّث التطبيق إجباريًا (يمسح النسخة المحفوظة ويحمّل أحدث نسخة)
+(function(){
+  var el=document.getElementById('ptr'),y0=null,d=0,TH=90;
+  function atTop(){return (window.scrollY||document.documentElement.scrollTop)<=0}
+  document.addEventListener('touchstart',function(e){if(e.touches.length===1&&atTop()&&!e.target.closest('.tbl,select,input,textarea,details[open]'))y0=e.touches[0].clientY;else y0=null;d=0},{passive:true});
+  document.addEventListener('touchmove',function(e){if(y0===null)return;d=e.touches[0].clientY-y0;if(d<=0||!atTop()){el.style.transform='translateY(-60px)';return}
+    var t=Math.min(d*.5,80);el.style.transform='translateY('+(t-10)+'px) rotate('+(d*2)+'deg)';el.style.opacity=Math.min(1,d/TH)},{passive:true});
+  document.addEventListener('touchend',function(){if(y0===null)return;y0=null;
+    if(d*.5>=TH*.5&&atTop()){el.classList.add('spin');el.style.transform='translateY(60px)';hardReload()}else el.style.transform='translateY(-60px)';d=0});
+  function hardReload(){
+    var jobs=[];
+    try{if(window.caches)jobs.push(caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k)}))}))}catch(e){}
+    try{if(navigator.serviceWorker)jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.update()}))}))}catch(e){}
+    Promise.all(jobs).catch(function(){}).then(function(){setTimeout(function(){location.reload()},250)});
+  }
 })();
 </script>
 <!-- Firebase: يحل محل قاعدة بيانات Claude عند النشر كموقع مستقل -->
