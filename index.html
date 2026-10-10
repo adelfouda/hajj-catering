@@ -185,6 +185,9 @@ aside{background:color-mix(in srgb,var(--surface) 92%,transparent)}
 .panel,.stat,.job{background:color-mix(in srgb,var(--surface) 90%,transparent)}
 @media (max-width:820px){.wm{top:56px;bottom:calc(58px + env(safe-area-inset-bottom,0px));flex-direction:column;justify-content:space-around;gap:0;opacity:.09}.wm svg{width:96vw;max-height:40%}.wm{opacity:.13}}
 @media print{.wm{display:none}}
+.cfm{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.cfm-box{background:var(--surface);color:var(--fg);border-radius:12px;padding:20px;max-width:380px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);display:flex;flex-direction:column;gap:16px}
+.cfm-box p{margin:0;line-height:1.7}.cfm-box .row{justify-content:flex-start}
 .cb-list{position:absolute;z-index:60;overflow-y:auto;overscroll-behavior:contain;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.18);display:flex;flex-direction:column}
 .cb-list button{all:unset;box-sizing:border-box;width:100%;padding:11px 14px;cursor:pointer;border-bottom:1px solid var(--line);font:inherit;color:var(--fg);text-align:start}
 .cb-list button:last-child{border-bottom:0}.cb-list button:hover,.cb-list button:focus-visible{background:var(--accent-soft);color:var(--accent)}
@@ -502,6 +505,13 @@ document.addEventListener('click',e=>{
 });
 
 /* قوائم اختيار مخصّصة بدل قائمة المتصفح: بتظهر تحت الخانة مباشرة وبتتفلتر وانت بتكتب */
+function askConfirm(msg,okText){return new Promise(res=>{
+  const w=document.createElement('div');w.className='cfm';w.setAttribute('role','dialog');w.setAttribute('aria-modal','true');
+  w.innerHTML=`<div class="cfm-box"><p>${esc(msg)}</p><div class="row"><button class="btn danger" data-ok>${esc(okText||'حذف')}</button><button class="btn ghost" data-no>إلغاء</button></div></div>`;
+  const done=v=>{w.remove();res(v)};
+  w.addEventListener('click',e=>{if(e.target.closest('[data-ok]'))done(true);else if(e.target.closest('[data-no]')||e.target===w)done(false)});
+  document.body.appendChild(w);w.querySelector('[data-no]').focus();});}
+const canAdmin=()=>['admin','manager'].includes(me().role);
 const CB={inp:null,box:null};
 const cbOpts=t=>{const dl=document.getElementById(t.dataset.list);return dl?[...new Set([...dl.options].map(o=>o.value).filter(Boolean))]:[]};
 function cbShow(t){
@@ -731,7 +741,7 @@ requests(){
   ${R.map(r=>`<tr><td>${fmtDate(r.date)}</td><td>${esc(comp(proj(r.projectId)?.companyId)?.name||'')}</td><td>${esc(proj(r.projectId)?.name||'')}</td><td>${esc(r.hotel)}</td><td>${esc(natOf(r))||'—'}</td><td>${esc(r.meal)}</td><td>${kindOf(r)}</td><td style="white-space:normal;min-width:140px">${esc(r.items)||'—'}</td><td><span class="ltr">${r.time}</span></td>
     <td><input type="number" value="${r.count}" data-cnt="${r.id}" style="width:90px" aria-label="عدد الوجبات" ${r.status!=='pending'?'disabled':''}></td>
     <td><span class="pill p-${r.status}">${ST[r.status]}</span></td>
-    <td class="noprint" style="white-space:nowrap"><button class="btn small" data-redit="${r.id}">تعديل</button> ${r.status==='pending'?`<button class="btn small danger" data-del="${r.id}">حذف</button>`:''}</td></tr>`).join('')}
+    <td class="noprint" style="white-space:nowrap"><button class="btn small" data-redit="${r.id}">تعديل</button> ${r.status==='pending'||canAdmin()?`<button class="btn small danger" data-del="${r.id}">حذف</button>`:''}</td></tr>`).join('')}
   </tbody></table></div><p class="hint">الإجمالي: ${sum(R,r=>+r.count).toLocaleString('ar-EG')} وجبة في ${R.length} طلب.</p>`:`<p class="hint">لا توجد طلبات في هذا النطاق.</p>`}
   </div>`;
 },
@@ -852,10 +862,13 @@ projects(){
       save();render()};
     if($('#coCancel'))$('#coCancel').onclick=()=>{ui.coEdit=null;render()};
     document.querySelectorAll('[data-coed]').forEach(b=>b.onclick=()=>{ui.coEdit=b.dataset.coed;render();window.scrollTo({top:0,behavior:'smooth'});setTimeout(()=>$('#coName')&&$('#coName').focus(),300)});
-    document.querySelectorAll('[data-codel]').forEach(b=>b.onclick=()=>{const id=b.dataset.codel;
-      if(S.requests.some(r=>proj(r.projectId)?.companyId===id)){toast('مينفعش تحذف شركة عليها طلبات. احذف طلباتها الأول أو عدّل اسمها');return}
-      if(!b.dataset.sure){b.dataset.sure=1;b.textContent='تأكيد الحذف';return}
-      S.companies=S.companies.filter(c=>c.id!==id);S.projects=S.projects.filter(p=>p.companyId!==id);if(ui.coEdit===id)ui.coEdit=null;save();render();toast('حُذفت الشركة')});
+    document.querySelectorAll('[data-codel]').forEach(b=>b.onclick=async()=>{const id=b.dataset.codel,c=comp(id);if(!c)return;
+      const pids=S.projects.filter(p=>p.companyId===id).map(p=>p.id);const rq=S.requests.filter(r=>pids.includes(r.projectId));
+      if(rq.length&&!canAdmin()){toast('الشركة دي عليها طلبات، وحذفها متاح لمدير النظام والإدارة بس');return}
+      const msg=rq.length?`حذف شركة «${c.name}» وكل طلباتها؟ عددها ${rq.length} طلب، وصور الفواتير اللي عليها هتتحذف كمان. الحذف ده نهائي.`:`حذف شركة «${c.name}»؟`;
+      if(!await askConfirm(msg,rq.length?'حذف الشركة وطلباتها':'حذف'))return;
+      S.requests=S.requests.filter(r=>!pids.includes(r.projectId));S.projects=S.projects.filter(p=>p.companyId!==id);S.companies=S.companies.filter(x=>x.id!==id);
+      if(ui.coEdit===id)ui.coEdit=null;save();render();toast('حُذفت الشركة'+(rq.length?' و'+rq.length+' طلب':''))});
     document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{ui.editProject=JSON.parse(JSON.stringify(proj(b.dataset.edit)));render()});
     document.querySelectorAll('[data-gen]').forEach(b=>b.onclick=()=>{const n=genDay(b.dataset.gen,today);toast(n?`أُنشئ ${n} طلب لليوم`:'طلبات اليوم موجودة بالفعل')});
     const MN_HEAD=['القسم','اسم الوجبة','النوع','المكوّنات'];
@@ -1000,9 +1013,11 @@ requests(){
     src.forEach(r=>{if(S.requests.some(x=>x.projectId===r.projectId&&x.date===ui.date&&x.hotel===r.hotel&&x.meal===r.meal))return;S.requests.push({...r,id:uid(),date:ui.date,status:'pending',driver:'',vehicle:'',departedAt:'',deliveredAt:'',invoices:[]});n++});
     save();render();toast(`نُسخ ${n} طلب`)};
   document.querySelectorAll('[data-cnt]').forEach(i=>i.onchange=()=>{S.requests.find(r=>r.id===i.dataset.cnt).count=+i.value;save();render()});
-  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
-    if(!b.dataset.sure){b.dataset.sure=1;b.textContent='تأكيد الحذف';return}
-    S.requests=S.requests.filter(r=>r.id!==b.dataset.del);save();render();toast('حُذف الطلب')});
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{const r=S.requests.find(x=>x.id===b.dataset.del);if(!r)return;
+    const extra=r.status!=='pending'?` الطلب ده حالته «${ST[r.status]}»`+(r.invoices.length?` وعليه ${r.invoices.length} صورة فاتورة هتتحذف معاه.`:'.'):'';
+    if(!await askConfirm(`حذف طلب ${r.meal} — ${r.hotel} — بتاريخ ${fmtDate(r.date)}؟${extra}`))return;
+    if(ui.reqEdit===r.id)ui.reqEdit=null;
+    S.requests=S.requests.filter(x=>x.id!==r.id);save();render();toast('حُذف الطلب')});
 },
 execution(){
   bindDateControls();
