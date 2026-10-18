@@ -603,10 +603,10 @@ const NATS=['مصر','السعودية','السودان','الأردن','فلس�
 const hotelNat=(p,h)=>(h&&h.nationality!==undefined?h.nationality:comp(p?.companyId)?.nationality)||'';
 const natOf=r=>{if(r.nat)return r.nat;const p=proj(r.projectId);return hotelNat(p,p?.hotels.find(h=>h.name===r.hotel))};
 function reqRows(){
-  return reqList().map(r=>{const a=[fmtDate(r.date),comp(proj(r.projectId)?.companyId)?.name||'',proj(r.projectId)?.name||'',r.hotel,r.tripNo||'',natOf(r),r.meal,kindOf(r),r.items||'',r.time,r.count,ST[r.status],r.driver||'',r.driverPhone||''];
+  return reqList().map(r=>{const a=[fmtDate(r.date),comp(proj(r.projectId)?.companyId)?.name||'',proj(r.projectId)?.name||'',r.hotel,r.tripNo||'',r.contractNo||'',natOf(r),r.meal,kindOf(r),r.items||'',r.time,r.count,ST[r.status],r.driver||'',r.driverPhone||''];
     if(canAdmin())a.push(r.price!==undefined&&r.price!==''?+r.price:'',r.price?+r.price*+r.count:'');return a});
 }
-const HEADS0=['التاريخ','الشركة','المشروع','الفندق','رقم الرحلة','الجنسية','الوجبة','النوع','المكوّنات','الوقت','العدد','الحالة','السائق','جوال السائق'];
+const HEADS0=['التاريخ','الشركة','المشروع','الفندق','رقم الرحلة','رقم العقد','الجنسية','الوجبة','النوع','المكوّنات','الوقت','العدد','الحالة','السائق','جوال السائق'];
 const heads=()=>canAdmin()?HEADS0.concat(['سعر الوجبة','الإجمالي']):HEADS0;
 async function saveFile(filename,data){
   try{const d=await claude.use('downloads');if(!d){toast('التحميل غير متاح هنا');return}
@@ -720,6 +720,7 @@ requests(){
       <label class="f" for="rNat">جنسية الحجاج<input id="rNat" list="rNatL" autocomplete="off"></label>
       <datalist id="rNatL">${NATS.map(n=>`<option value="${n}">`).join('')}</datalist>
       <label class="f" for="rTrip">رقم الرحلة<input id="rTrip" placeholder="مثال: SV1234"></label>
+      <label class="f" for="rCtNo">رقم العقد · إن وجد<input id="rCtNo" placeholder="اختياري"></label>
       ${ui.reqEdit?'':`<label class="f" for="rDays">عدد الأيام<input type="number" id="rDays" min="1" value="1"></label>
       <div class="f" style="grid-column:1/-1">الوجبات<div class="chips mchk">${MCHK.map(m=>`<label class="chk"><input type="checkbox" data-mc="${m}">${m}</label>`).join('')}</div><span class="hint">اختار وجبة أو أكتر، وهيتعمل طلب لكل وجبة في كل يوم من عدد الأيام. لو ماختارتش، هيتاخد اللي في خانة الوجبة.</span></div>`}
       <label class="f" for="rMeal">الوجبة<input title="اضغط لعرض كل الوجبات" id="rMeal" list="rMealL" autocomplete="off" placeholder="اختر أو اكتب وجبة"></label>
@@ -754,7 +755,7 @@ requests(){
     <label class="f" for="fSort">ترتيب حسب<select id="fSort">${Object.entries(SORTS).map(([k,v])=>`<option value="${k}" ${ui.sortBy===k?'selected':''}>${v}</option>`).join('')}</select></label></div></div>
   <div class="row noprint"><button class="btn primary" id="prtBtn">طباعة الجدول</button><button class="btn" id="htmlBtn" hidden>حفظ نسخة للطباعة</button><button class="btn" id="xlsxBtn" hidden>تصدير إلى إكسل (XLSX)</button></div>
   ${R.length?`<div class="tbl"><table><thead><tr><th>التاريخ</th><th>الشركة</th><th>المشروع</th><th>الفندق</th><th>الرحلة</th><th>الجنسية</th><th>الوجبة</th><th>النوع</th><th>المكوّنات</th><th>الوقت</th><th>العدد</th>${canAdmin()?'<th>السعر</th><th>الإجمالي</th>':''}<th>الحالة</th><th class="noprint"></th></tr></thead><tbody>
-  ${R.map(r=>`<tr><td>${fmtDate(r.date)}</td><td>${esc(comp(proj(r.projectId)?.companyId)?.name||'')}</td><td>${esc(proj(r.projectId)?.name||'')}</td><td>${esc(r.hotel)}</td><td style="white-space:nowrap">${esc(r.tripNo)||'—'}${contractOf(r.contractId)?` <a href="#" class="noprint" data-ct="${r.contractId}" title="عقد التسكين">📄</a>`:''}</td><td>${esc(natOf(r))||'—'}</td><td>${esc(r.meal)}</td><td>${kindOf(r)}</td><td style="white-space:normal;min-width:140px">${esc(r.items)||'—'}</td><td><span class="ltr">${r.time}</span></td>
+  ${R.map(r=>`<tr><td>${fmtDate(r.date)}</td><td>${esc(comp(proj(r.projectId)?.companyId)?.name||'')}</td><td>${esc(proj(r.projectId)?.name||'')}</td><td>${esc(r.hotel)}</td><td style="white-space:nowrap">${esc(r.tripNo)||'—'}${r.contractNo?`<div class="muted" style="font-size:.8rem">عقد ${esc(r.contractNo)}</div>`:''}${contractOf(r.contractId)?` <a href="#" class="noprint" data-ct="${r.contractId}" title="عقد التسكين">📄</a>`:''}</td><td>${esc(natOf(r))||'—'}</td><td>${esc(r.meal)}</td><td>${kindOf(r)}</td><td style="white-space:normal;min-width:140px">${esc(r.items)||'—'}</td><td><span class="ltr">${r.time}</span></td>
     <td><input type="number" value="${r.count}" data-cnt="${r.id}" style="width:90px" aria-label="عدد الوجبات" ${r.status!=='pending'?'disabled':''}></td>
     ${canAdmin()?`<td class="num">${r.price?(+r.price).toLocaleString('ar-EG'):'—'}</td><td class="num">${r.price?(+r.price*+r.count).toLocaleString('ar-EG'):'—'}</td>`:''}
     <td><span class="pill p-${r.status}">${ST[r.status]}</span></td>
@@ -775,7 +776,7 @@ execution(){
   ${R.length?`<div class="cards">${R.map(r=>{const p=proj(r.projectId);return `
     <div class="job ${r.status}">
       <div class="top"><div><h3>${esc(r.hotel)}</h3><div class="muted" style="font-size:.85rem">${esc(comp(p?.companyId)?.name)}${natOf(r)?' · '+esc(natOf(r)):''}</div></div><span class="pill p-${r.status}">${ST[r.status]}</span></div>
-      <div class="row" style="gap:16px">${ui.dateMode!=='day'?`<span>${fmtDate(r.date)}</span>`:''}<span><b>${esc(r.meal)}</b> · ${kindOf(r)}</span>${r.tripNo?`<span>رحلة <b>${esc(r.tripNo)}</b></span>`:''}${contractOf(r.contractId)?`<a href="#" data-ct="${r.contractId}">📄 العقد</a>`:''}<span class="ltr">${r.time}</span><span><b style="font-variant-numeric:tabular-nums">${r.count}</b> وجبة</span></div>
+      <div class="row" style="gap:16px">${ui.dateMode!=='day'?`<span>${fmtDate(r.date)}</span>`:''}<span><b>${esc(r.meal)}</b> · ${kindOf(r)}</span>${r.tripNo?`<span>رحلة <b>${esc(r.tripNo)}</b></span>`:''}${r.contractNo?`<span>عقد <b>${esc(r.contractNo)}</b></span>`:''}${contractOf(r.contractId)?`<a href="#" data-ct="${r.contractId}">📄 العقد</a>`:''}<span class="ltr">${r.time}</span><span><b style="font-variant-numeric:tabular-nums">${r.count}</b> وجبة</span></div>
       ${r.items?`<div class="hint">المكوّنات: ${esc(r.items)}</div>`:''}
       ${r.status==='pending'?`<div class="fields" style="grid-template-columns:1fr 1fr 1fr">
         <label class="f" for="drv-${r.id}">السائق<input id="drv-${r.id}" value="${isDriver?esc(me().name.replace(/\s*\(.*\)/,'')):''}"></label>
@@ -1022,7 +1023,7 @@ requests(){
     else if(!hotelNat(p,h)&&V('#rNat'))h.nationality=V('#rNat');
     let contractId=ed0?ed0.contractId||'':'';
     if(ui.ctDraft){contractId='ct_'+uid();S.settings.push({id:contractId,type:'contract',src:ui.ctDraft.src,name:ui.ctDraft.name,at:new Date().toISOString(),by:me().name});ui.ctDraft=null}
-    const single=meals.length===1,common={projectId:p.id,hotel:hn,nat:V('#rNat'),count:c,tripNo:V('#rTrip'),contractId};
+    const single=meals.length===1,common={projectId:p.id,hotel:hn,nat:V('#rNat'),count:c,tripNo:V('#rTrip'),contractNo:V('#rCtNo'),contractId};
     if(canAdmin()&&$('#rPrice'))common.price=$('#rPrice').value===''?'':+$('#rPrice').value;
     const mkFields=(meal,d)=>{let m=p.meals.find(x=>x.type===meal);
       if(!m){const ms=menuOf(meal),one=ms.length===1?ms[0]:null;
@@ -1040,7 +1041,7 @@ requests(){
   if(ui.reqEdit&&!re)ui.reqEdit=null;
   if(re){const rp=proj(re.projectId);$('#rComp').value=comp(rp?.companyId)?.name||'';$('#rProjN').value=rp?.name||'';fillProjList();
     $('#rDate').value=re.date;$('#rHotel').value=re.hotel;$('#rNat').value=natOf(re)||'';$('#rMeal').value=re.meal;fillMenu();
-    $('#rKind').value=re.kind||'hot';$('#rTime').value=re.time||'';$('#rCount').value=re.count;$('#rItems').value=re.items||'';$('#rTrip').value=re.tripNo||'';if($('#rPrice'))$('#rPrice').value=re.price??'';
+    $('#rKind').value=re.kind||'hot';$('#rTime').value=re.time||'';$('#rCount').value=re.count;$('#rItems').value=re.items||'';$('#rTrip').value=re.tripNo||'';$('#rCtNo').value=re.contractNo||'';if($('#rPrice'))$('#rPrice').value=re.price??'';
     document.querySelectorAll('#reqForm .auto').forEach(x=>x.classList.remove('auto'))}
   if($('#reqCancel'))$('#reqCancel').onclick=()=>{ui.reqEdit=null;ui.ctDraft=null;render()};
   document.querySelectorAll('[data-redit]').forEach(b=>b.onclick=()=>{ui.reqEdit=b.dataset.redit;render();const f=$('#reqForm');f&&f.scrollIntoView({behavior:'smooth',block:'start'})});
