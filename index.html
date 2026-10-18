@@ -185,6 +185,7 @@ aside{background:color-mix(in srgb,var(--surface) 92%,transparent)}
 .panel,.stat,.job{background:color-mix(in srgb,var(--surface) 90%,transparent)}
 @media (max-width:820px){.wm{top:56px;bottom:calc(58px + env(safe-area-inset-bottom,0px));flex-direction:column;justify-content:space-around;gap:0;opacity:.09}.wm svg{width:96vw;max-height:40%}.wm{opacity:.13}}
 @media print{.wm{display:none}}
+.mchk{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.mchk .chk{display:flex;align-items:center;gap:6px;padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);cursor:pointer;font-weight:500}.mchk .chk:has(input:checked){background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
 .cfm{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
 .cfm-box{background:var(--surface);color:var(--fg);border-radius:12px;padding:20px;max-width:380px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);display:flex;flex-direction:column;gap:16px}
 .cfm-box p{margin:0;line-height:1.7}.cfm-box .row{justify-content:flex-start}
@@ -512,6 +513,14 @@ function askConfirm(msg,okText){return new Promise(res=>{
   w.addEventListener('click',e=>{if(e.target.closest('[data-ok]'))done(true);else if(e.target.closest('[data-no]')||e.target===w)done(false)});
   document.body.appendChild(w);w.querySelector('[data-no]').focus();});}
 const canAdmin=()=>['admin','manager'].includes(me().role);
+const MCHK=['استقبال','فطور','غداء','عشاء'];
+const MDEF={'استقبال':'16:00','فطور':'06:00','غداء':'13:00','عشاء':'20:00','سحور':'03:00','إفطار رمضان':'18:00','وجبة خفيفة':'17:00'};
+const contractOf=id=>id&&(S.settings||[]).find(x=>x.id===id);
+function openContract(id){const c=contractOf(id);if(!c){toast('العقد مش موجود');return}
+  if(/^data:image\//.test(c.src))return lightbox(c.src);
+  try{const m=c.src.match(/^data:([^;]+);base64,(.*)$/);const bin=atob(m[2]),u=new Uint8Array(bin.length);for(let k=0;k<bin.length;k++)u[k]=bin.charCodeAt(k);
+    const url=URL.createObjectURL(new Blob([u],{type:m[1]}));const w=window.open(url,'_blank');if(!w)saveFile(c.name||'contract.pdf',new Blob([u],{type:m[1]}))}catch(e){toast('تعذّر فتح العقد')}}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-ct]');if(b){e.preventDefault();openContract(b.dataset.ct)}});
 const CB={inp:null,box:null};
 const cbOpts=t=>{const dl=document.getElementById(t.dataset.list);return dl?[...new Set([...dl.options].map(o=>o.value).filter(Boolean))]:[]};
 function cbShow(t){
@@ -594,9 +603,11 @@ const NATS=['مصر','السعودية','السودان','الأردن','فلس�
 const hotelNat=(p,h)=>(h&&h.nationality!==undefined?h.nationality:comp(p?.companyId)?.nationality)||'';
 const natOf=r=>{if(r.nat)return r.nat;const p=proj(r.projectId);return hotelNat(p,p?.hotels.find(h=>h.name===r.hotel))};
 function reqRows(){
-  return reqList().map(r=>[fmtDate(r.date),comp(proj(r.projectId)?.companyId)?.name||'',proj(r.projectId)?.name||'',r.hotel,natOf(r),r.meal,kindOf(r),r.items||'',r.time,r.count,ST[r.status],r.driver||'',r.driverPhone||'']);
+  return reqList().map(r=>{const a=[fmtDate(r.date),comp(proj(r.projectId)?.companyId)?.name||'',proj(r.projectId)?.name||'',r.hotel,r.tripNo||'',natOf(r),r.meal,kindOf(r),r.items||'',r.time,r.count,ST[r.status],r.driver||'',r.driverPhone||''];
+    if(canAdmin())a.push(r.price!==undefined&&r.price!==''?+r.price:'',r.price?+r.price*+r.count:'');return a});
 }
-const HEADS=['التاريخ','الشركة','المشروع','الفندق','الجنسية','الوجبة','النوع','المكوّنات','الوقت','العدد','الحالة','السائق','جوال السائق'];
+const HEADS0=['التاريخ','الشركة','المشروع','الفندق','رقم الرحلة','الجنسية','الوجبة','النوع','المكوّنات','الوقت','العدد','الحالة','السائق','جوال السائق'];
+const heads=()=>canAdmin()?HEADS0.concat(['سعر الوجبة','الإجمالي']):HEADS0;
 async function saveFile(filename,data){
   try{const d=await claude.use('downloads');if(!d){toast('التحميل غير متاح هنا');return}
     await d.save({filename,data});toast('تم الحفظ')}
@@ -604,7 +615,7 @@ async function saveFile(filename,data){
 }
 function exportXLSX(){
   if(!window.XLSX){toast('تعذّر تحميل مكتبة إكسل');return}
-  const rows=[HEADS].concat(reqRows());
+  const rows=[heads()].concat(reqRows());
   const ws=XLSX.utils.aoa_to_sheet(rows);
   ws['!cols']=[14,26,24,22,10,12,30,8,8,16,16,16].map(w=>({wch:w}));
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'الطلبات');
@@ -628,7 +639,7 @@ function invAction(id,print){
 }
 function exportPrintable(){
   const rows=reqRows(),tot=sum(reqList(),r=>+r.count);
-  const html='<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>جدول الطلبات</title><style>body{font-family:Tahoma,Arial,sans-serif;margin:20px;color:#000}h1{font-size:18px}p{font-size:12px;color:#444}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #888;padding:5px 7px;text-align:right}th{background:#eee}@page{size:A4 landscape;margin:12mm}</style></head><body><h1>إعاشة الحجاج — جدول الطلبات: '+esc(scopeLabel())+'</h1><p>'+esc(filterText())+' · ترتيب حسب '+SORTS[ui.sortBy]+'</p><table><thead><tr>'+HEADS.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(c=>'<td>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</tbody></table><p>الإجمالي: '+tot+' وجبة في '+rows.length+' طلب.</p><script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>';
+  const html='<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>جدول الطلبات</title><style>body{font-family:Tahoma,Arial,sans-serif;margin:20px;color:#000}h1{font-size:18px}p{font-size:12px;color:#444}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #888;padding:5px 7px;text-align:right}th{background:#eee}@page{size:A4 landscape;margin:12mm}</style></head><body><h1>إعاشة الحجاج — جدول الطلبات: '+esc(scopeLabel())+'</h1><p>'+esc(filterText())+' · ترتيب حسب '+SORTS[ui.sortBy]+'</p><table><thead><tr>'+heads().map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(c=>'<td>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</tbody></table><p>الإجمالي: '+tot+' وجبة في '+rows.length+' طلب.</p><script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>';
   saveFile('requests-print-'+scopeTag()+'.html',html);
 }
 const VIEWS={
@@ -708,6 +719,9 @@ requests(){
       <datalist id="rHotelL"></datalist>
       <label class="f" for="rNat">جنسية الحجاج<input id="rNat" list="rNatL" autocomplete="off"></label>
       <datalist id="rNatL">${NATS.map(n=>`<option value="${n}">`).join('')}</datalist>
+      <label class="f" for="rTrip">رقم الرحلة<input id="rTrip" placeholder="مثال: SV1234"></label>
+      ${ui.reqEdit?'':`<label class="f" for="rDays">عدد الأيام<input type="number" id="rDays" min="1" value="1"></label>
+      <div class="f" style="grid-column:1/-1">الوجبات<div class="chips mchk">${MCHK.map(m=>`<label class="chk"><input type="checkbox" data-mc="${m}">${m}</label>`).join('')}</div><span class="hint">اختار وجبة أو أكتر، وهيتعمل طلب لكل وجبة في كل يوم من عدد الأيام. لو ماختارتش، هيتاخد اللي في خانة الوجبة.</span></div>`}
       <label class="f" for="rMeal">الوجبة<input title="اضغط لعرض كل الوجبات" id="rMeal" list="rMealL" autocomplete="off" placeholder="اختر أو اكتب وجبة"></label>
       <datalist id="rMealL">${MEALS.map(m=>`<option value="${m}">`).join('')}</datalist>
       <label class="f" for="rMenu">الوجبة من القائمة<select id="rMenu"><option value="">—</option></select></label>
@@ -715,6 +729,8 @@ requests(){
       <label class="f" for="rTime">وقت التسليم<input type="time" id="rTime"></label>
       <label class="f" for="rCount">عدد الوجبات<input type="number" id="rCount" min="1"></label>
       <label class="f" for="rItems" style="grid-column:1/-1">المكوّنات<input id="rItems" placeholder="مثال: أرز، دجاج، سلطة"></label>
+      ${canAdmin()?`<label class="f" for="rPrice">سعر الوجبة · للإدارة فقط<input type="number" id="rPrice" min="0" step="0.01" placeholder="بالريال"></label>`:''}
+      <div class="f" style="grid-column:1/-1">ورقة عقد التسكين<div class="row"><span class="btn small upl">📷 تصوير العقد<input type="file" id="ctCam" accept="image/*" capture="environment" aria-label="تصوير عقد التسكين"></span><span class="btn small ghost upl">📎 صورة أو ملف<input type="file" id="ctFile" accept="image/*,application/pdf" aria-label="اختيار عقد التسكين"></span><span class="hint" id="ctState">${ui.ctDraft?'✅ العقد جاهز ويتحفظ مع الطلب':((()=>{const e=ui.reqEdit&&S.requests.find(r=>r.id===ui.reqEdit);return e&&contractOf(e.contractId)?`<a href="#" data-ct="${e.contractId}">📄 عرض العقد المرفق</a>`:''})())}</span></div></div>
     </div>
     <p class="hint">اختر من القوائم فتُملأ باقي الحقول تلقائيًا (الحقول المظلّلة). وإذا كتبت شركة أو مشروعًا أو فندقًا أو وجبة غير مسجلة، تُضاف تلقائيًا للقوائم عند الحفظ.</p>
     <div class="row"><button class="btn primary" id="addReq">${ui.reqEdit?'حفظ التعديل':'حفظ الطلب'}</button>${ui.reqEdit?'<button class="btn small ghost" id="reqCancel">إلغاء التعديل</button>':''}</div>
@@ -737,12 +753,13 @@ requests(){
       <button class="btn small ghost" id="fClear">مسح التصفية</button></div></details></div>
     <label class="f" for="fSort">ترتيب حسب<select id="fSort">${Object.entries(SORTS).map(([k,v])=>`<option value="${k}" ${ui.sortBy===k?'selected':''}>${v}</option>`).join('')}</select></label></div></div>
   <div class="row noprint"><button class="btn primary" id="prtBtn">طباعة الجدول</button><button class="btn" id="htmlBtn" hidden>حفظ نسخة للطباعة</button><button class="btn" id="xlsxBtn" hidden>تصدير إلى إكسل (XLSX)</button></div>
-  ${R.length?`<div class="tbl"><table><thead><tr><th>التاريخ</th><th>الشركة</th><th>المشروع</th><th>الفندق</th><th>الجنسية</th><th>الوجبة</th><th>النوع</th><th>المكوّنات</th><th>الوقت</th><th>العدد</th><th>الحالة</th><th class="noprint"></th></tr></thead><tbody>
-  ${R.map(r=>`<tr><td>${fmtDate(r.date)}</td><td>${esc(comp(proj(r.projectId)?.companyId)?.name||'')}</td><td>${esc(proj(r.projectId)?.name||'')}</td><td>${esc(r.hotel)}</td><td>${esc(natOf(r))||'—'}</td><td>${esc(r.meal)}</td><td>${kindOf(r)}</td><td style="white-space:normal;min-width:140px">${esc(r.items)||'—'}</td><td><span class="ltr">${r.time}</span></td>
+  ${R.length?`<div class="tbl"><table><thead><tr><th>التاريخ</th><th>الشركة</th><th>المشروع</th><th>الفندق</th><th>الرحلة</th><th>الجنسية</th><th>الوجبة</th><th>النوع</th><th>المكوّنات</th><th>الوقت</th><th>العدد</th>${canAdmin()?'<th>السعر</th><th>الإجمالي</th>':''}<th>الحالة</th><th class="noprint"></th></tr></thead><tbody>
+  ${R.map(r=>`<tr><td>${fmtDate(r.date)}</td><td>${esc(comp(proj(r.projectId)?.companyId)?.name||'')}</td><td>${esc(proj(r.projectId)?.name||'')}</td><td>${esc(r.hotel)}</td><td style="white-space:nowrap">${esc(r.tripNo)||'—'}${contractOf(r.contractId)?` <a href="#" class="noprint" data-ct="${r.contractId}" title="عقد التسكين">📄</a>`:''}</td><td>${esc(natOf(r))||'—'}</td><td>${esc(r.meal)}</td><td>${kindOf(r)}</td><td style="white-space:normal;min-width:140px">${esc(r.items)||'—'}</td><td><span class="ltr">${r.time}</span></td>
     <td><input type="number" value="${r.count}" data-cnt="${r.id}" style="width:90px" aria-label="عدد الوجبات" ${r.status!=='pending'?'disabled':''}></td>
+    ${canAdmin()?`<td class="num">${r.price?(+r.price).toLocaleString('ar-EG'):'—'}</td><td class="num">${r.price?(+r.price*+r.count).toLocaleString('ar-EG'):'—'}</td>`:''}
     <td><span class="pill p-${r.status}">${ST[r.status]}</span></td>
     <td class="noprint" style="white-space:nowrap"><button class="btn small" data-redit="${r.id}">تعديل</button> ${r.status==='pending'||canAdmin()?`<button class="btn small danger" data-del="${r.id}">حذف</button>`:''}</td></tr>`).join('')}
-  </tbody></table></div><p class="hint">الإجمالي: ${sum(R,r=>+r.count).toLocaleString('ar-EG')} وجبة في ${R.length} طلب.</p>`:`<p class="hint">لا توجد طلبات في هذا النطاق.</p>`}
+  </tbody></table></div><p class="hint">الإجمالي: ${sum(R,r=>+r.count).toLocaleString('ar-EG')} وجبة في ${R.length} طلب.${canAdmin()&&R.some(r=>r.price)?` · قيمة الطلبات: ${sum(R,r=>(+r.price||0)*+r.count).toLocaleString('ar-EG')} ريال`:''}</p>`:`<p class="hint">لا توجد طلبات في هذا النطاق.</p>`}
   </div>`;
 },
 
@@ -758,7 +775,7 @@ execution(){
   ${R.length?`<div class="cards">${R.map(r=>{const p=proj(r.projectId);return `
     <div class="job ${r.status}">
       <div class="top"><div><h3>${esc(r.hotel)}</h3><div class="muted" style="font-size:.85rem">${esc(comp(p?.companyId)?.name)}${natOf(r)?' · '+esc(natOf(r)):''}</div></div><span class="pill p-${r.status}">${ST[r.status]}</span></div>
-      <div class="row" style="gap:16px">${ui.dateMode!=='day'?`<span>${fmtDate(r.date)}</span>`:''}<span><b>${esc(r.meal)}</b> · ${kindOf(r)}</span><span class="ltr">${r.time}</span><span><b style="font-variant-numeric:tabular-nums">${r.count}</b> وجبة</span></div>
+      <div class="row" style="gap:16px">${ui.dateMode!=='day'?`<span>${fmtDate(r.date)}</span>`:''}<span><b>${esc(r.meal)}</b> · ${kindOf(r)}</span>${r.tripNo?`<span>رحلة <b>${esc(r.tripNo)}</b></span>`:''}${contractOf(r.contractId)?`<a href="#" data-ct="${r.contractId}">📄 العقد</a>`:''}<span class="ltr">${r.time}</span><span><b style="font-variant-numeric:tabular-nums">${r.count}</b> وجبة</span></div>
       ${r.items?`<div class="hint">المكوّنات: ${esc(r.items)}</div>`:''}
       ${r.status==='pending'?`<div class="fields" style="grid-template-columns:1fr 1fr 1fr">
         <label class="f" for="drv-${r.id}">السائق<input id="drv-${r.id}" value="${isDriver?esc(me().name.replace(/\s*\(.*\)/,'')):''}"></label>
@@ -980,9 +997,20 @@ requests(){
   $('#rComp').onchange=fillProjList;$('#rProjN').onchange=fillProjDeps;
   $('#rHotel').onchange=fillHotel;$('#rMeal').onchange=fillMeal;
   ['#rProjN','#rHotel','#rNat','#rMeal','#rKind','#rTime','#rCount','#rItems'].forEach(s=>$(s).addEventListener('input',()=>$(s).classList.remove('auto')));
+  const ctPick=async inp=>{window.__picking=false;const f=inp.files[0];inp.value='';if(!f)return;toast('جارٍ تجهيز العقد...');
+    try{let src;if(f.type==='application/pdf'){src=await new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=no;fr.readAsDataURL(f)});
+        if(src.length>900000){toast('ملف العقد كبير. صوّره بالكاميرا أو ارفعه كصورة');return}}
+      else src=await resizeImage(f);
+      ui.ctDraft={src,name:f.name||'contract'};const st=$('#ctState');if(st)st.textContent='✅ العقد جاهز ويتحفظ مع الطلب';toast('العقد جاهز، اضغط حفظ')}
+    catch(e){toast('تعذّرت قراءة العقد')}};
+  ['#ctCam','#ctFile'].forEach(id=>{const i=$(id);if(!i)return;i.onclick=()=>{window.__picking=true;setTimeout(()=>{window.__picking=false},120000)};i.oncancel=()=>{window.__picking=false};i.onchange=()=>ctPick(i)});
   $('#addReq').onclick=()=>{
     const cn=V('#rComp'),pn=V('#rProjN'),hn=V('#rHotel'),mn=V('#rMeal'),c=+$('#rCount').value,date=$('#rDate').value;
-    if(!cn||!pn||!hn||!mn||!c||!date){toast('أكمل الشركة والمشروع والفندق والوجبة والعدد والتاريخ');return}
+    const ed0=ui.reqEdit&&S.requests.find(r=>r.id===ui.reqEdit);
+    const checked=[...document.querySelectorAll('[data-mc]:checked')].map(x=>x.dataset.mc);
+    const meals=ed0?(mn?[mn]:[]):(checked.length?checked:(mn?[mn]:[]));
+    const days=ed0?1:Math.max(1,Math.min(60,+($('#rDays')&&$('#rDays').value)||1));
+    if(!cn||!pn||!hn||!meals.length||!c||!date){toast('أكمل الشركة والمشروع والفندق والوجبة والعدد والتاريخ');return}
     const added=[];
     let co=S.companies.find(x=>x.name===cn);
     if(!co){co={id:uid(),name:cn,contact:'',phone:''};S.companies.push(co);added.push('شركة')}
@@ -992,20 +1020,29 @@ requests(){
     let h=p.hotels.find(x=>x.name===hn);
     if(!h){h={name:hn,pilgrims:c,nationality:V('#rNat')};p.hotels.push(h);added.push('فندق')}
     else if(!hotelNat(p,h)&&V('#rNat'))h.nationality=V('#rNat');
-    let m=p.meals.find(x=>x.type===mn);
-    if(!m){m={type:mn,time:$('#rTime').value||'12:00',kind:$('#rKind').value,items:V('#rItems'),menuId:$('#rMenu').value};p.meals.push(m);added.push('وجبة')}
-    const fields={projectId:p.id,date,hotel:hn,nat:V('#rNat'),meal:mn,time:$('#rTime').value||m.time,kind:$('#rKind').value,items:V('#rItems'),count:c};
-    const ed=ui.reqEdit&&S.requests.find(r=>r.id===ui.reqEdit);
-    if(ed){Object.assign(ed,fields);ui.reqEdit=null}
-    else S.requests.push({id:uid(),...fields,status:'pending',driver:'',vehicle:'',departedAt:'',deliveredAt:'',invoices:[]});
-    ui.date=date;save();render();toast((ed?'اتحفظ تعديل الطلب':'حُفظ الطلب')+(added.length?'، وأُضيف للقوائم: '+added.join('، '):''))};
+    let contractId=ed0?ed0.contractId||'':'';
+    if(ui.ctDraft){contractId='ct_'+uid();S.settings.push({id:contractId,type:'contract',src:ui.ctDraft.src,name:ui.ctDraft.name,at:new Date().toISOString(),by:me().name});ui.ctDraft=null}
+    const single=meals.length===1,common={projectId:p.id,hotel:hn,nat:V('#rNat'),count:c,tripNo:V('#rTrip'),contractId};
+    if(canAdmin()&&$('#rPrice'))common.price=$('#rPrice').value===''?'':+$('#rPrice').value;
+    const mkFields=(meal,d)=>{let m=p.meals.find(x=>x.type===meal);
+      if(!m){const ms=menuOf(meal),one=ms.length===1?ms[0]:null;
+        m=single?{type:meal,time:$('#rTime').value||MDEF[meal]||'12:00',kind:$('#rKind').value,items:V('#rItems'),menuId:$('#rMenu').value}
+                :{type:meal,time:MDEF[meal]||'12:00',kind:one?one.kind:'hot',items:one?one.items:'',menuId:one?one.id:''};
+        p.meals.push(m);if(!added.includes('وجبة'))added.push('وجبة')}
+      return single?{...common,date:d,meal,time:$('#rTime').value||m.time,kind:$('#rKind').value,items:V('#rItems')}
+                   :{...common,date:d,meal,time:m.time,kind:m.kind||'hot',items:m.items||''}};
+    let n=0;
+    if(ed0){Object.assign(ed0,mkFields(meals[0],date));ui.reqEdit=null;n=1}
+    else for(let k=0;k<days;k++){const d=addDays(date,k);if(d>p.end)p.end=d;
+      for(const meal of meals){S.requests.push({id:uid(),...mkFields(meal,d),status:'pending',driver:'',vehicle:'',departedAt:'',deliveredAt:'',invoices:[]});n++}}
+    ui.date=date;save();render();toast((ed0?'اتحفظ تعديل الطلب':(n>1?`اتحفظ ${n} طلب`:'حُفظ الطلب'))+(added.length?'، وأُضيف للقوائم: '+added.join('، '):''))};
   const re=ui.reqEdit&&S.requests.find(r=>r.id===ui.reqEdit);
   if(ui.reqEdit&&!re)ui.reqEdit=null;
   if(re){const rp=proj(re.projectId);$('#rComp').value=comp(rp?.companyId)?.name||'';$('#rProjN').value=rp?.name||'';fillProjList();
     $('#rDate').value=re.date;$('#rHotel').value=re.hotel;$('#rNat').value=natOf(re)||'';$('#rMeal').value=re.meal;fillMenu();
-    $('#rKind').value=re.kind||'hot';$('#rTime').value=re.time||'';$('#rCount').value=re.count;$('#rItems').value=re.items||'';
+    $('#rKind').value=re.kind||'hot';$('#rTime').value=re.time||'';$('#rCount').value=re.count;$('#rItems').value=re.items||'';$('#rTrip').value=re.tripNo||'';if($('#rPrice'))$('#rPrice').value=re.price??'';
     document.querySelectorAll('#reqForm .auto').forEach(x=>x.classList.remove('auto'))}
-  if($('#reqCancel'))$('#reqCancel').onclick=()=>{ui.reqEdit=null;render()};
+  if($('#reqCancel'))$('#reqCancel').onclick=()=>{ui.reqEdit=null;ui.ctDraft=null;render()};
   document.querySelectorAll('[data-redit]').forEach(b=>b.onclick=()=>{ui.reqEdit=b.dataset.redit;render();const f=$('#reqForm');f&&f.scrollIntoView({behavior:'smooth',block:'start'})});
   $('#genDay').onclick=()=>{const n=genDay($('#qProj').value,ui.date);render();toast(n?`أُنشئ ${n} طلب`:'كل طلبات هذا المشروع موجودة لهذا اليوم')};
   $('#copyPrev').onclick=()=>{const prev=addDays(ui.date,-1);const src=S.requests.filter(r=>r.date===prev&&r.projectId===$('#qProj').value);
